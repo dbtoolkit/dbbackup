@@ -1,0 +1,34 @@
+【功能】
+数据库备份，支持mysqldump/xtrabackup/mysqllvm/mongolvm/binlog/ftp备份
+
+【目录结构】
+
+├── common
+│   ├── Binlog.pm            # mysql binlog备份模块
+│   ├── Dbbackup.pm          # 备份公共模块
+│   ├── Dbconfig.pm          # 备份配置模块
+│   ├── Ftp.pm               # ftp备份模块
+│   ├── Lvm.pm               # 通用lvm备份模块
+│   ├── ManagerUtil.pm       # 工具包
+│   ├── Mongodump.pm         # mongdump备份模块
+│   ├── Mongolvm.pm          # mongo lvm备份模块
+│   ├── Mylvm.pm             # mysql lvm备份模块
+│   ├── Mysqldump.pm         # mysqldump备份模块
+│   ├── mysqldump_split.sh   # mysqldump处理脚本
+│   └── Xtrabackup.pm        # mysql xtrabackup备份模块
+├── dbbackup.pl              # 备份主程序
+├── install
+│   ├── dbms.sql             # 数据库表结构
+│   └── grant.sql            # 数据库权限
+├── logs
+├── status
+└── var
+
+【使用方法】
+1、页面添加备份计划
+   
+2、备份节点部署
+（1）部署上述dbbackup目录到/home/mysql/dbadmin/scripts
+（2）新增crontab任务
+# db backup
+30 1 * * * source /etc/profile && source ~/.bash_profile && perl /home/mysql/dbadmin/scripts/dbbackup/dbbackup.pl >/tmp/dbbackup.log 2>&1
