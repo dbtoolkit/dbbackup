@@ -164,13 +164,8 @@ sub main {
     my $flushTableLockLimit = $self->{dbconfigObj}->get('hotbakFlushTableLockLimit');
      
     # 检查xtrabackup安装
-    my $checkRes = $self->{dbbackupObj}->runCommandReturnCode("which xtrabackup");
-    chomp($checkRes);
-    if ( $checkRes != 0 ){
-        $log->error("xtrabackup is not installed, exit backup");
-        
-        # 结束备份
-        return 0;
+    if ( ! -e "/usr/bin/xtrabackup" ){
+        $log->error("xtrabackup is not installed");
     }
     $log->info("xtrabackup is already installed");
     

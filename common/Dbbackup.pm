@@ -2428,7 +2428,7 @@ sub rsyncBackupset {
         my $isSnapshotOk = $self->checkSnapshotFreeSize($lvPath,$lvName);
         $log->debug("get \$isSnapshotOk: $isSnapshotOk");
 
-        open(CHL,"/tmp/lvm_rsync_$childMask") or die "open /tmp/lvm_rsync_$childMask failed";
+        open(CHL,"</tmp/lvm_rsync_$childMask") or die "open /tmp/lvm_rsync_$childMask failed";
         while (<CHL>){
             if ( $_ =~ /(\d+)/ ){
                 $rsyncThreadPid = $1;

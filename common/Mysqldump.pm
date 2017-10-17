@@ -237,7 +237,7 @@ sub main {
         my $size = 0;
         my $status = 0;
         my $message = "running";
-        my $backupsetStatus = "";
+        my $backupsetStatus = "unknown";
         my $startTime = $self->{dbbackupObj}->getCurrentTime();
         my $endTime = "0000-00-00 00:00:00";
         my $updateTime = $self->{dbbackupObj}->getCurrentTime();
@@ -307,53 +307,24 @@ sub main {
     
             # 压缩
             if ( lc($isEncrypted) eq "n" && lc($isCompressed) eq "y" ){
-                my $compressFile = $self->{dbbackupObj}->compressBackup($host,$port,$dbType,$bakType,$bakDir,$startTime);
-                if ( $compressFile ){
-                    # 压缩成功
-                    $log->info("compress backupset success");
+                $log->info("gzip backup files: $bakDir");
+                system("find $bakDir -name \"*\" -type f -exec gzip {} \\;");
+                
+                # 压缩成功
+                $log->info("compress backupset success");
                   
-                    # 更新备份资料库
-                    my $size = $self->{dbbackupObj}->runCommand("du -s $bakDir|awk '{print \$1}'");
-                    my $status = 1;
-                    my $message = "compress success";
-                    my $backupsetStatus = "ok";
-                    my $endTime = $self->{dbbackupObj}->getCurrentTime();
-                    my $updateTime = $self->{dbbackupObj}->getCurrentTime();
-                    my $masterLogFile = "no";
-                    my $masterLogPos = 0;
-     
-                    $self->{dbbackupObj}->updateBackupInfo($recordId,$endTime,$size,$status,$message,
-                        $fileDir,$backupsetStatus,$updateTime,$masterLogFile,$masterLogPos);
-           
-                }else{
-                    # 压缩失败
-                    $log->error("compress backupset failed");
-        
-                    # 删除无效备份集
-                    $log->info("compress backupset failed, start removing backupset");
-                    
-                    my $removeRes = $self->{dbbackupObj}->removeDirectory($bakDir);
-                    if ( $removeRes ){   
-                        $log->info("remove backup dir: $bakDir success");
-                    }else{
-                        $log->error("remove backup dir $bakDir failed");
-                    }
-                    
-                    # 更新备份资料库
-                    my $size = 0;
-                    my $status = 2;
-                    my $message = "compress failed";
-                    my $backupsetStatus = "deleted";
-                    my $endTime = $self->{dbbackupObj}->getCurrentTime();
-                    my $updateTime = $self->{dbbackupObj}->getCurrentTime();
-                    my $masterLogFile = "no";
-                    my $masterLogPos = 0;
-    
-                    $self->{dbbackupObj}->updateBackupInfo($recordId,$endTime,$size,$status,$message,
-                        $fileDir,$backupsetStatus,$updateTime,$masterLogFile,$masterLogPos);
-    
-                    exit 1;
-                }    
+                # 更新备份资料库
+                my $size = $self->{dbbackupObj}->runCommand("du -s $bakDir|awk '{print \$1}'");
+                my $status = 1;
+                my $message = "compress success";
+                my $backupsetStatus = "ok";
+                my $endTime = $self->{dbbackupObj}->getCurrentTime();
+                my $updateTime = $self->{dbbackupObj}->getCurrentTime();
+                my $masterLogFile = "no";
+                my $masterLogPos = 0;
+ 
+                $self->{dbbackupObj}->updateBackupInfo($recordId,$endTime,$size,$status,$message,
+                    $fileDir,$backupsetStatus,$updateTime,$masterLogFile,$masterLogPos);
             }
     
             # 清理过期备份  
@@ -408,7 +379,7 @@ sub runBackup {
     my $size = 0;
     my $status = 0;
     my $message = "running";
-    my $backupsetStatus = "ok";
+    my $backupsetStatus = "unknown";
     my $endTime = $self->{dbbackupObj}->getCurrentTime();
     my $updateTime = $self->{dbbackupObj}->getCurrentTime();
     my $masterLogFile = "no";
@@ -427,7 +398,7 @@ sub runBackup {
         close CHLD_OUT;
         close CHLD_ERR;
         
-        $log->info("backup process is: $backupPid");
+        $log->debug("backup process is: $backupPid");
         
         # 监控备份执行过程
         while (1){
@@ -450,19 +421,22 @@ sub runBackup {
                 $log->info("waiting for mysqldump ending");
             }
             
+            # 获取脚本执行退出状态码
             open BAKSTAT,$statusFile;
-            my $isDone = <BAKSTAT>;
+            my $mysqldumpExitCode = <BAKSTAT>;
             close BAKSTAT;
+
+            $log->info("mysqldump script exit code: $mysqldumpExitCode");
             
-            $log->info("backup result: $isDone");
-            if ( $isDone == 0 ){
+            chomp($mysqldumpExitCode);
+            if ( $mysqldumpExitCode == 0 ){
                 $isDone = 1;
                 last;
             }
             
             my $kid = 0;
             $kid = waitpid($backupPid, WNOHANG);
-            $log->info("kid is $kid ; backupPid is $backupPid");
+            $log->debug("kid is $kid ; backupPid is $backupPid");
                         
             if ( $kid == $backupPid or $kid == -1 ){
                 $log->info("backup child process $kid end");
@@ -487,8 +461,7 @@ sub runBackup {
                 $sessionNo = 0;
             }
             
-            $log->info("processlist status is $procStat , sessionNo is $sessionNo ,
-                table lock time is $tableLock");
+            $log->info("processlist status:$procStat,sessionNo:$sessionNo,table lock time: $tableLock");
             
             if ( ($tableLock+60) > $flushTableLockLimit ){
                 $log->error("flush tables longer than $flushTableLockLimit");
@@ -502,14 +475,15 @@ sub runBackup {
                 last;
             }
         }
-        
+
         if ( $isDone ){
             last;
         }
     }
     
-    # mysql版本大于5118
+    # 检查备份日志
     if ( $versionCode > 5118 ){
+    # mysql版本大于5118
         my $errs;
         if ( -f $detailLog ){
             open DETAIL,'<',$detailLog;
@@ -541,50 +515,50 @@ sub runBackup {
         }
     }
     
-    $size = $self->{dbbackupObj}->runCommand("du -s $bakDir|awk '{print \$1}'");
-    $message = "none";    
-    $backupsetStatus = "deleted";
-    $endTime = $self->{dbbackupObj}->getCurrentTime();
-    $updateTime = $self->{dbbackupObj}->getCurrentTime();  
-    $masterLogFile = "no";
-    $masterLogPos = 0;
-
     # 被blocked
     if ( $isBlocked ){
-        $message = "flush_tables_timeout";
         $isSuccess = 0;
+
+        $size = 0;
+        $status = 2;
+        $message = "flush_tables_timeout";   
+        $backupsetStatus = "deleted";
     }
     
     # 被kill掉
     if ( $isKilled ){
-        $message = "mysqldump_been_killed";
         $isSuccess = 0;
+
+        $size = 0;
+        $status = 2;
+        $message = "mysqldump_been_killed";   
+        $backupsetStatus = "deleted";
     }
     
     # 备份成功
     if ( ($isDone && $isSuccess) ){
-        
-        $message = "success";
+        $size = $self->{dbbackupObj}->runCommand("du -s $bakDir|awk '{print \$1}'");
+        $status = 1;
+        $message = "success";    
         $backupsetStatus = "ok";
-        
-        $log->info("backup ok");
-        
-        $self->{dbbackupObj}->getMasterInfo("$bakDir/header.sql");
-        
-        # 压缩备份
-        if ( lc($isCompressed) eq "y" ){
-            $log->info("gzip bakup files: $bakDir");
-            system("find $bakDir -name \"*\" -type f -exec gzip {} \\;");
-        }
     } else {
-        #rmtree($bakDir);
-        $log->error("remove failed backupset");
+        # 删除备份
+        $log->info("start removing backupset");
+        
+        my $removeRes = $self->{dbbackupObj}->removeDirectory($bakDir);
+        if ( $removeRes ){   
+            $log->info("remove backup dir: $bakDir success");
+        }else{
+            $log->error("remove backup dir $bakDir failed");
+        }
     }
-    
+
     # 更新备份资料库
     $endTime = $self->{dbbackupObj}->getCurrentTime();
-    $updateTime = $self->{dbbackupObj}->getCurrentTime();
-
+    $updateTime = $self->{dbbackupObj}->getCurrentTime();  
+    $masterLogFile = "no";
+    $masterLogPos = 0;
+    
     $self->{dbbackupObj}->updateBackupInfo($recordId,$endTime,$size,$status,$message,
         $fileDir,$backupsetStatus,$updateTime,$masterLogFile,$masterLogPos);
             

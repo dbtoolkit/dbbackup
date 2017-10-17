@@ -12,17 +12,8 @@ use Log::Log4perl;
 # @Description:  load config data
 sub load {
     my $self = shift;
-    $self->{defaultDbHost} = '127.0.0.1';             # 数据库主机
-    $self->{defaultDbPort} = '3306';                  # 数据库端口
-    $self->{defaultDbName} = 'mysql';                 # 数据库名称
-    $self->{defaultDbUser} = 'dbbackup';              # 数据库用户名
-    $self->{defaultDbPassword} = 'dbbackup';     # 数据库密码
     $self->{dbbackupDir} = "/home/mysql/dbadmin/scripts/dbbackup/";
     $self->{mysqldumpSplitScript} = "/home/mysql/dbadmin/scripts/dbbackup/common/mysqldump_split.sh";
-    $self->{mysqlLvmExpireDays} = 15;
-    $self->{mysqldumpExpireDays} = 30;
-    $self->{mysqlHotbakExpireDays} = 15;
-    $self->{mysqlBinlogExpireDays} = 30;
     $self->{hotbakFlushTableLockLimit} = 300;
     $self->{dumpFlushTableLockLimit} = 300;
     $self->{mysqlHomedir} = "/home/mysql";
@@ -31,12 +22,7 @@ sub load {
     $self->{infinidbBaseLogdir} = "/home/infinidb/dbadmin/logs";
     $self->{mytab} = "/etc/mytab";
     $self->{excuteCmdTimeout} = 60;    # dbbackup.pm $timeout 
-    
-    # 备份限速
-    $self->{mysqlLvmSpeed} = 20000;    # rsync --bwlimit= 20000 KBPS (20MB/S)
-    $self->{backupBinlogSpeed} = 20000;    # rsync --bwlimit= 20000 KBPS (20MB/S)
-    $self->{mysqlHotbakThrottle} = 30;
-    
+
     # ftp server 
     $self->{ftpuser} = 'ftpbak';
     $self->{ftppass} = 'ftpbak';
